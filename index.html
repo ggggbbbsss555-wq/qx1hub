@@ -538,7 +538,7 @@ body{background:var(--bg);color:var(--text)}
     <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input-area">
       <textarea class="chat-input" id="chatInput" placeholder="Type a message..." rows="1" autocomplete="off"></textarea>
-      <button class="chat-send-btn" id="chatSendBtn"><svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      <button class="chat-send-btn" id="chatSendBtn" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
     </div>
   </div>
 
@@ -1139,6 +1139,9 @@ function sendMsg(){
   S.chat.lm='You: '+txt;S.chat.tm='now';
   chatInput.value='';
   autoGrowTextarea();
+  // Keep keyboard open: re-focus the input immediately after sending
+  // (clearing value or clicking send button can blur the input on mobile)
+  chatInput.focus({preventScroll:true});
   vibrate(8);
   appendChatMsg(m);updateConvDOM(S.chat.id);
   const chatId=S.chat.id;
@@ -1157,7 +1160,16 @@ function sendMsg(){
     if(c)updateConvDOM(chatId);
   },1200+Math.random()*1500);
 }
-chatSendBtn.addEventListener('click',sendMsg);
+// When clicking the send button, prevent it from blurring the input (which closes keyboard)
+chatSendBtn.addEventListener('click',function(e){
+  e.preventDefault();
+  sendMsg();
+  // Re-focus immediately to keep keyboard open
+  chatInput.focus({preventScroll:true});
+});
+// Prevent mousedown on send button from blurring the input
+chatSendBtn.addEventListener('mousedown',function(e){e.preventDefault();});
+chatSendBtn.addEventListener('touchstart',function(e){e.preventDefault();},{passive:false});
 chatInput.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&!e.shiftKey){
     e.preventDefault();
