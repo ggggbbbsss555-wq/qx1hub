@@ -2,7 +2,7 @@
 <html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>QXHub — Social</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
@@ -186,6 +186,8 @@ body{background:var(--bg);color:var(--text)}
   overflow:hidden;
   overscroll-behavior:contain;
   touch-action:none;
+  /* JS sets --kb-height (keyboard height) when soft keyboard opens on mobile */
+  --kb-height:0px;
 }
 .chat-overlay.visible{opacity:1;pointer-events:auto}
 
@@ -258,13 +260,14 @@ body{background:var(--bg);color:var(--text)}
 }
 .chat-message-time{font-size:10px;opacity:0.7;margin-top:3px}
 
+/* Input area: pinned to bottom, pushed up when keyboard opens */
 .chat-input-area{
   position:relative;
   display:flex;
   align-items:flex-end;
   gap:8px;
   padding:10px 12px;
-  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px) + var(--kb-height,0px));
   border-top:1px solid var(--border);
   background:var(--bg);
   flex:0 0 auto;
@@ -353,7 +356,7 @@ body{background:var(--bg);color:var(--text)}
 .profile-tile-stats{position:absolute;bottom:6px;right:8px;color:#fff;font-size:11px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.8);display:flex;align-items:center;gap:3px}
 
 /* ===== Create ===== */
-.create-overlay{position:fixed;inset:0;width:100%;height:100%;height:100dvh;background:var(--bg);z-index:200;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease;overflow:hidden;transform:translateY(20px)}
+.create-overlay{position:fixed;inset:0;width:100%;height:100%;height:100dvh;background:var(--bg);z-index:200;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease;overflow:hidden;transform:translateY(20px);overscroll-behavior:contain;--kb-height:0px}
 .create-overlay.visible{opacity:1;pointer-events:auto;transform:translateY(0)}
 .create-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
 .create-title{font-size:16px;font-weight:700;color:var(--text)}
@@ -377,7 +380,7 @@ body{background:var(--bg);color:var(--text)}
 .create-image-remove{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.7);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.1s ease}
 .create-image-remove:active{transform:scale(0.88)}
 .create-image-remove svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.create-footer{padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.create-footer{padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px) + var(--kb-height,0px));border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
 .create-tool{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;color:var(--text);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s ease,transform 0.1s ease}
 .create-tool:hover{background:var(--bg4)}
 .create-tool:active{transform:scale(0.95)}
@@ -1025,9 +1028,11 @@ function openChat(c){
   chatOverlay.classList.add('visible');
   // Lock body scroll to prevent chat-header from disappearing on mobile
   document.body.style.overflow='hidden';
+  // Start tracking visualViewport (keyboard) for this chat
+  attachViewportTracker(chatOverlay);
   requestAnimationFrame(()=>{
     chatMessages.scrollTop=chatMessages.scrollHeight;
-    setTimeout(()=>{chatInput.focus();},300);
+    setTimeout(()=>{chatInput.focus({preventScroll:true});},300);
   });
 }
 function closeChat(){
@@ -1037,6 +1042,57 @@ function closeChat(){
   autoGrowTextarea();
   S.chat=null;
   document.body.style.overflow='';
+  detachViewportTracker(chatOverlay);
+}
+
+/* ===== Visual Viewport Tracker (handles mobile keyboard) ===== */
+/* When the soft keyboard opens on mobile, visualViewport.height shrinks.
+   We compute the keyboard height and set --kb-height on the overlay, which
+   pushes the input area up so it stays visible above the keyboard.
+   The overlay itself stays full-screen, so nothing jumps or scrolls. */
+let _viewportHandler=null;
+let _trackedOverlays=[];
+function attachViewportTracker(overlay){
+  if(_trackedOverlays.indexOf(overlay)===-1)_trackedOverlays.push(overlay);
+  if(_viewportHandler)return; // handler already attached
+  _viewportHandler=()=>{
+    if(!window.visualViewport)return;
+    const vvH=window.visualViewport.height;
+    const winH=window.innerHeight;
+    // Keyboard height = difference between layout viewport and visual viewport
+    const kbH=Math.max(0,winH-vvH);
+    _trackedOverlays.forEach(o=>{
+      if(o&&o.classList.contains('visible')){
+        o.style.setProperty('--kb-height',kbH+'px');
+      }
+    });
+    // If chat is open, scroll messages to bottom after resize so last message stays visible
+    if(S.chat&&chatOverlay.classList.contains('visible')){
+      requestAnimationFrame(()=>{chatMessages.scrollTop=chatMessages.scrollHeight;});
+    }
+  };
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',_viewportHandler);
+    window.visualViewport.addEventListener('scroll',_viewportHandler);
+  }
+  window.addEventListener('resize',_viewportHandler);
+  // Run once immediately
+  _viewportHandler();
+}
+function detachViewportTracker(overlay){
+  const idx=_trackedOverlays.indexOf(overlay);
+  if(idx!==-1)_trackedOverlays.splice(idx,1);
+  // Reset this overlay's keyboard height
+  if(overlay)overlay.style.setProperty('--kb-height','0px');
+  // If no more tracked overlays, remove global listener
+  if(_trackedOverlays.length===0&&_viewportHandler){
+    if(window.visualViewport){
+      window.visualViewport.removeEventListener('resize',_viewportHandler);
+      window.visualViewport.removeEventListener('scroll',_viewportHandler);
+    }
+    window.removeEventListener('resize',_viewportHandler);
+    _viewportHandler=null;
+  }
 }
 function renderChatMsgs(){
   if(!S.chat)return;
@@ -1291,9 +1347,9 @@ const createTextarea=document.getElementById('createTextarea');
 const createShare=document.getElementById('createShare');
 const createImgPreview=document.getElementById('createImagePreview');
 const createImgImg=document.getElementById('createImageImg');
-document.getElementById('createBtn').addEventListener('click',function(){createOverlay.classList.add('visible');setTimeout(()=>createTextarea.focus(),200);});
+document.getElementById('createBtn').addEventListener('click',function(){createOverlay.classList.add('visible');document.body.style.overflow='hidden';attachViewportTracker(createOverlay);setTimeout(()=>createTextarea.focus({preventScroll:true}),200);});
 document.getElementById('createCancel').addEventListener('click',closeCreate);
-function closeCreate(){createOverlay.classList.remove('visible');createTextarea.value='';createImg=null;createImgPreview.classList.remove('visible');createShare.classList.remove('active');}
+function closeCreate(){createOverlay.classList.remove('visible');createTextarea.value='';createImg=null;createImgPreview.classList.remove('visible');createShare.classList.remove('active');document.body.style.overflow='';detachViewportTracker(createOverlay);}
 createTextarea.addEventListener('input',function(){createShare.classList.toggle('active',createTextarea.value.trim().length>0||createImg);});
 document.getElementById('createAddImage').addEventListener('click',function(){document.getElementById('createFileInput').click();});
 document.getElementById('createFileInput').addEventListener('change',function(e){
