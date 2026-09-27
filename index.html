@@ -169,7 +169,7 @@ body{background:var(--bg);color:var(--text)}
 .conv-preview.unread{color:var(--text);font-weight:600}
 .conv-unread{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
-/* ===== Chat Overlay — FIXED LAYOUT ===== */
+/* ===== Chat Overlay — FIXED LAYOUT (header & input never move) ===== */
 .chat-overlay{
   position:fixed;
   inset:0;
@@ -184,10 +184,13 @@ body{background:var(--bg);color:var(--text)}
   pointer-events:none;
   transition:opacity 0.2s ease;
   overflow:hidden;
+  overscroll-behavior:contain;
+  touch-action:none;
 }
 .chat-overlay.visible{opacity:1;pointer-events:auto}
 
 .chat-header{
+  position:relative;
   display:flex;
   align-items:center;
   gap:12px;
@@ -195,10 +198,9 @@ body{background:var(--bg);color:var(--text)}
   padding-top:calc(10px + env(safe-area-inset-top,0px));
   border-bottom:1px solid var(--border);
   background:var(--bg);
-  flex-shrink:0;
-  flex-grow:0;
+  flex:0 0 auto;
   min-height:56px;
-  z-index:3;
+  z-index:5;
 }
 .chat-back{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--text);cursor:pointer;border-radius:50%;flex-shrink:0;transition:background 0.15s ease,transform 0.1s ease}
 .chat-back:hover{background:var(--hover)}
@@ -222,11 +224,14 @@ body{background:var(--bg);color:var(--text)}
   overflow-y:auto;
   overflow-x:hidden;
   padding:16px;
+  padding-top:calc(16px + env(safe-area-inset-top,0px));
   display:flex;
   flex-direction:column;
   gap:8px;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
+  overscroll-behavior-y:contain;
+  touch-action:pan-y;
 }
 .chat-message{
   max-width:78%;
@@ -254,6 +259,7 @@ body{background:var(--bg);color:var(--text)}
 .chat-message-time{font-size:10px;opacity:0.7;margin-top:3px}
 
 .chat-input-area{
+  position:relative;
   display:flex;
   align-items:flex-end;
   gap:8px;
@@ -261,9 +267,8 @@ body{background:var(--bg);color:var(--text)}
   padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
   border-top:1px solid var(--border);
   background:var(--bg);
-  flex-shrink:0;
-  flex-grow:0;
-  z-index:3;
+  flex:0 0 auto;
+  z-index:5;
 }
 
 .chat-input{
@@ -321,6 +326,7 @@ body{background:var(--bg);color:var(--text)}
 .profile-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px}
 .profile-bio{font-size:13px;color:var(--text2);line-height:1.45;margin-bottom:12px;white-space:pre-wrap}
 .profile-actions{display:flex;gap:8px;align-items:center}
+.profile-actions:empty{display:none}
 .profile-btn{flex:1;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s ease,transform 0.1s ease,opacity 0.15s ease;display:flex;align-items:center;justify-content:center;gap:6px;min-height:34px}
 .profile-btn:hover{background:var(--bg4)}
 .profile-btn:active{transform:scale(0.97)}
@@ -1017,6 +1023,8 @@ function openChat(c){
   autoGrowTextarea();
   renderChatMsgs();
   chatOverlay.classList.add('visible');
+  // Lock body scroll to prevent chat-header from disappearing on mobile
+  document.body.style.overflow='hidden';
   requestAnimationFrame(()=>{
     chatMessages.scrollTop=chatMessages.scrollHeight;
     setTimeout(()=>{chatInput.focus();},300);
@@ -1028,6 +1036,7 @@ function closeChat(){
   chatInput.value='';
   autoGrowTextarea();
   S.chat=null;
+  document.body.style.overflow='';
 }
 function renderChatMsgs(){
   if(!S.chat)return;
@@ -1156,15 +1165,14 @@ function renderProfile(){
   const backBtn=document.getElementById('profileBack');
   const titleEl=document.getElementById('profileTitle');
   if(isOwn){
-    // Own profile: single "Edit Profile" button (no Message, no Follow, no menu)
+    // Own profile: no action buttons at all (no Message, no Follow, no Edit, no menu)
     msgBtn.style.display='none';
-    followBtn.style.display='flex';
-    followBtn.querySelector('span').textContent='Edit Profile';
-    followBtn.classList.add('following');
-    followBtn.classList.remove('primary');
+    followBtn.style.display='none';
     menuBtn.classList.remove('visible');
     backBtn.classList.remove('visible');
     titleEl.classList.remove('visible');
+    // Hide the actions container entirely
+    document.querySelector('.profile-actions').style.display='none';
   }else{
     // Other user profile: Message + Follow + 3-dots menu
     msgBtn.style.display='flex';
@@ -1178,6 +1186,8 @@ function renderProfile(){
     backBtn.classList.add('visible');
     titleEl.classList.add('visible');
     titleEl.textContent=viewing.n;
+    // Show the actions container
+    document.querySelector('.profile-actions').style.display='flex';
   }
   // Grid
   const grid=document.getElementById('profileGrid');
