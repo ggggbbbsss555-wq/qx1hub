@@ -711,7 +711,7 @@ function buildPostHTML(p){
   const img=p.img&&IMG[p.img]?'<img class="post-image" src="'+IMG[p.img]+'" alt=""/>':'';
   const cap=p.cap?'<div class="post-caption"><span class="username" data-uid="'+p.u.id+'">'+esc(p.u.n)+'</span>'+esc(p.cap)+'</div>':'';
   const viewBtn=p.cmts.length>0?'<button class="view-comments-btn" data-pid="'+p.id+'">'+(p.co?'Hide comments':'View all '+p.cmts.length+' comments')+'</button>':'';
-  return '<div class="post-header"><div class="avatar post-avatar" data-uid="'+p.u.id+'"><div class="avatar-placeholder">'+esc(p.u.i)+'</div></div><div class="post-user-info" data-uid="'+p.u.id+'"><div class="post-username">'+esc(p.u.n)+vSvg+'</div><div class="post-time">'+ago(p.t)+'</div></div><button class="post-menu-btn" data-pid="'+p.id+'"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div><div class="post-content"><div class="post-text">'+p.txt+'</div></div>'+img+'<div class="post-actions"><button class="action-btn like-btn'+(p.liked?' liked':'')+'" data-pid="'+p.id+'"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button><button class="action-btn comment-btn" data-pid="'+p.id+'"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="count">'+p.cmts.length+'</span></button></div><div class="post-stats">'+fmt(p.likes)+' likes</div>'+cap+viewBtn+'<div class="comments-section'+(p.co?' open':'')+'" data-pid="'+p.id+'"><div class="comments-list" data-pid="'+p.id+'"></div><div class="add-comment"><input type="text" placeholder="Add a comment..." class="comment-input" data-pid="'+p.id+'"/><button class="post-comment-btn" data-pid="'+p.id+'">Post</button></div></div>';
+  return '<div class="post-header"><div class="avatar post-avatar" data-uid="'+p.u.id+'"><div class="avatar-placeholder">'+esc(p.u.i)+'</div></div><div class="post-user-info" data-uid="'+p.u.id+'"><div class="post-username">'+esc(p.u.n)+vSvg+'</div><div class="post-time">'+ago(p.t)+'</div></div><button class="post-menu-btn" data-pid="'+p.id+'"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div><div class="post-content"><div class="post-text">'+p.txt+'</div></div>'+img+'<div class="post-actions"><button class="action-btn like-btn'+(p.liked?' liked':'')+'" data-pid="'+p.id+'"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="count">'+fmt(p.likes)+'</span></button><button class="action-btn comment-btn" data-pid="'+p.id+'"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="count">'+p.cmts.length+'</span></button></div>'+cap+viewBtn+'<div class="comments-section'+(p.co?' open':'')+'" data-pid="'+p.id+'"><div class="comments-list" data-pid="'+p.id+'"></div><div class="add-comment"><input type="text" placeholder="Add a comment..." class="comment-input" data-pid="'+p.id+'"/><button class="post-comment-btn" data-pid="'+p.id+'">Post</button></div></div>';
 }
 function renderComments(pid){
   const p=S.posts.find(x=>x.id===pid);if(!p)return;
@@ -764,7 +764,8 @@ document.getElementById('feed').addEventListener('click',function(e){
     p.liked=!p.liked;p.likes+=p.liked?1:-1;
     likeBtn.classList.toggle('liked',p.liked);
     if(p.liked){likeBtn.classList.add('just-liked');vibrate(10);setTimeout(()=>likeBtn.classList.remove('just-liked'),450);}
-    likeBtn.closest('.post').querySelector('.post-stats').textContent=fmt(p.likes)+' likes';
+    const cntEl=likeBtn.querySelector('.count');
+    if(cntEl)cntEl.textContent=fmt(p.likes);
     return;
   }
   // Comment button
@@ -1155,16 +1156,17 @@ function renderProfile(){
   const backBtn=document.getElementById('profileBack');
   const titleEl=document.getElementById('profileTitle');
   if(isOwn){
-    msgBtn.style.display='flex';
-    msgBtn.querySelector('span').textContent='Message';
+    // Own profile: single "Edit Profile" button (no Message, no Follow, no menu)
+    msgBtn.style.display='none';
     followBtn.style.display='flex';
-    followBtn.querySelector('span').textContent='Follow';
+    followBtn.querySelector('span').textContent='Edit Profile';
     followBtn.classList.add('following');
     followBtn.classList.remove('primary');
     menuBtn.classList.remove('visible');
     backBtn.classList.remove('visible');
     titleEl.classList.remove('visible');
   }else{
+    // Other user profile: Message + Follow + 3-dots menu
     msgBtn.style.display='flex';
     msgBtn.querySelector('span').textContent='Message';
     followBtn.style.display='flex';
@@ -1216,7 +1218,8 @@ document.getElementById('profileMsgBtn').addEventListener('click',function(){
 });
 document.getElementById('profileFollowBtn').addEventListener('click',function(){
   if(S.viewingUserId===null){
-    showToast('This is your profile');
+    // Own profile → Edit Profile action
+    showToast('Edit profile coming soon');
     return;
   }
   toggleFollow(S.viewingUserId);
