@@ -1160,16 +1160,15 @@ function sendMsg(){
     if(c)updateConvDOM(chatId);
   },1200+Math.random()*1500);
 }
-// When clicking the send button, prevent it from blurring the input (which closes keyboard)
+// When clicking the send button, call sendMsg and keep input focused
 chatSendBtn.addEventListener('click',function(e){
-  e.preventDefault();
   sendMsg();
   // Re-focus immediately to keep keyboard open
   chatInput.focus({preventScroll:true});
 });
-// Prevent mousedown on send button from blurring the input
+// Prevent mousedown on send button from blurring the input (which closes keyboard)
+// NOTE: do NOT preventDefault on touchstart - it blocks the click event on mobile
 chatSendBtn.addEventListener('mousedown',function(e){e.preventDefault();});
-chatSendBtn.addEventListener('touchstart',function(e){e.preventDefault();},{passive:false});
 chatInput.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&!e.shiftKey){
     e.preventDefault();
